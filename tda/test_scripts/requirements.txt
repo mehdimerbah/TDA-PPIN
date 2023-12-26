@@ -1,0 +1,4 @@
+persim==0.3.2
+ripser==0.6.4
+networkx==3.2
+gudhi==3.8.0
