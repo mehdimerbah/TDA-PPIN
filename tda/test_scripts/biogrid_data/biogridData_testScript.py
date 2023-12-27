@@ -24,16 +24,16 @@ import itertools
 # %% 
 # # Setting directories for output files
 print("Creating the appropriate directories for script output...")
-degree_dist_dir = os.path.join(os.path.dirname(__file__), 'biogrid_data/plots/degree_dist/')
+degree_dist_dir = os.path.join(os.path.dirname(__file__), 'plots/degree_dist/')
 if not os.path.isdir(degree_dist_dir):
     os.makedirs(degree_dist_dir)
 
-barcode_diags_dir = os.path.join(os.path.dirname(__file__), 'biogrid_data/plots/barcode_diags/')
+barcode_diags_dir = os.path.join(os.path.dirname(__file__), 'plots/barcode_diags/')
 if not os.path.isdir(barcode_diags_dir):
     os.makedirs(barcode_diags_dir)
 
 ## Let's define the persistence diagrams directory to keep this neat
-pers_diags_dir = os.path.join(os.path.dirname(__file__), 'biogrid_data/plots/pers_diags/')
+pers_diags_dir = os.path.join(os.path.dirname(__file__), 'plots/pers_diags/')
 if not os.path.isdir(pers_diags_dir):
     os.makedirs(pers_diags_dir)
 
