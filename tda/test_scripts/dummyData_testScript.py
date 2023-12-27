@@ -114,7 +114,7 @@ for complex_proteins in [complex_1, complex_2, complex_3]:
 
 # %% 
 ## Node Degree Viualization
-## The following is just to check the distribution of the node degrees. As it seems like there are highly central nodes
+""" The following is just to check the distribution of the node degrees. As it seems like there are highly central nodes """
 degree_nodes = {}
 for p, d in protein_network.degree():
   degree_nodes[p] = d
@@ -141,10 +141,11 @@ plt.close()
 
 # %% [markdown]
 # # Applying Persistent Homology
-
+""" This is where we apply persistent homology on the dataset, we use both ripser and gudhi to extract the topological features as both libraries are useful in their own regard"""
 
 # %% [markdown]
 # ## Using the Adjacency Matrix
+"""Using the adjacency matrix from the networkX package with the ripser package defining the distance_matrix pararm as 'False'"""
 
 # %%
 ## Extract the adjacency matrix from the NetworkX package and fill the diagonal to indicate node self-connection
@@ -159,10 +160,8 @@ pn_diagrams = ripser.ripser(pn_adjacency, distance_matrix=False, maxdim=3)['dgms
 
 # %% [markdown]
 # ## Using Correlation Distance Matrix
-
-# %%
-## The reasoning here is that if the score value for the proteins measures semantic similarity, converting it 
-##to a dissimilarity measure would be a distance measure. as such protein-pairs with low scores would be "closer" to eachother.
+"""The reasoning here is that if the score value for the proteins measures semantic similarity, converting it 
+to a dissimilarity measure would be a distance measure. as such protein-pairs with low scores would be "closer" to eachother."""
 np.fill_diagonal(pn_adjacency, 1)
 pn_distance_mat = 1 - pn_adjacency
 
@@ -260,4 +259,5 @@ persistence = rips_simplex_tree.persistence(min_persistence=-1, persistence_dim_
 # Generate persistence diagrams
 diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000)
 plt.savefig(pers_diags_dir+'gudhi_VR_pers_diag.png')
+plt.close()
 
