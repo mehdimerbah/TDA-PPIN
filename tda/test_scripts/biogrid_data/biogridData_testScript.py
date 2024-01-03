@@ -8,6 +8,7 @@
 print("Importing packages and required libraries...")
 import os
 import sys
+import warnings
 import pandas as pd
 import numpy as np
 import ripser
@@ -155,12 +156,14 @@ pn_dist_mat = 1 - pn_adjacency
 
 # %%
 ## PH with correlation distance matrix
+print("Computing Ripser Persistent Homology on Corr-Dist matrix...")
 dist_mat_diags_ripser = ripser.ripser(pn_dist_mat, distance_matrix=True, maxdim=3)['dgms']
 plot_diagrams(dist_mat_diags_ripser)
 plt.savefig(pers_diags_dir+'dist_mat_diags_ripser.png')
 plt.close()
 
 # %%
+print("Saving Ripser persistence diagrams...")
 plot_diagrams(dist_mat_diags_ripser, plot_only=[0], title='Corr-Dist Pers Diagram Dim 0')
 plt.savefig(pers_diags_dir+'dist_mat_diags_ripser_Dim0.png')
 plt.close()
@@ -180,10 +183,12 @@ plot_barcode(dist_mat_diags_ripser, 2, 'Corr-Dist Barcode Diag Dim 2')
 
 # ## Gudhi Package Rips Complex Construction
 
+print("Constructing Rips Complex from Corr-Dist matrix...")
 rips_complex = gd.RipsComplex(distance_matrix=pn_dist_mat, max_edge_length=1.0)
 
 
 ## We now build a simplex tree to store the simplices
+print("Building Rips simplex tree...")
 rips_simplex_tree = rips_complex.create_simplex_tree(max_dimension=3)
 
 
@@ -198,13 +203,17 @@ with open('gudhi_VR_PH_results.txt', 'at') as results_file:
    results_file.close()
 
 ## Apply Persistence
-   
+print("Computing persistence on Rips Simplex Tree...")
 persistence = rips_simplex_tree.persistence(min_persistence=-1, persistence_dim_max=True)
 
 # Generate persistence diagrams
+print("Saving Rips Simplex Tree persistence diagrams...")
 diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000, title='Corr-Dist Mat Pers Diag')
 plt.savefig(pers_diags_dir+'gudhi_VR_pers_diagram.png')
 plt.close()
 
+
+
+print("Script finished executing!")
 sys.exit()
 
