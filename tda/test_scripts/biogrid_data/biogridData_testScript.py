@@ -37,6 +37,10 @@ pers_diags_dir = os.path.join(os.path.dirname(__file__), 'plots/pers_diags/')
 if not os.path.isdir(pers_diags_dir):
     os.makedirs(pers_diags_dir)
 
+## Creating a directory for the PH reuslts
+ph_results_dir = os.path.join(os.path.dirname(__file__), 'results/')
+if not os.path.isdir(ph_results_dir):
+   os.makedirs(ph_results_dir)
 
 
 # %%
@@ -172,3 +176,34 @@ plot_diagrams(dist_mat_diags_ripser, plot_only=[2], title='Corr-Dist Pers Diagra
 plt.savefig(pers_diags_dir+'dist_mat_diags_ripser_Dim2.png')
 plt.close()
 plot_barcode(dist_mat_diags_ripser, 2, 'Corr-Dist Barcode Diag Dim 2')
+
+# ## Gudhi Package Rips Complex Construction
+
+rips_complex = gd.RipsComplex(distance_matrix=pn_dist_mat, max_edge_length=1.0)
+
+
+## We now build a simplex tree to store the simplices
+rips_simplex_tree = rips_complex.create_simplex_tree(max_dimension=3)
+
+
+## Check how the complex looks like
+result_str = 'Rips complex is of dimension ' + repr(rips_simplex_tree.dimension()) + ' - ' + \
+    repr(rips_simplex_tree.num_simplices()) + ' simplices - ' + \
+    repr(rips_simplex_tree.num_vertices()) + ' vertices.\n'
+
+
+with open('gudhi_VR_PH_results.txt', 'at') as results_file:
+   results_file.write(result_str)
+   results_file.close()
+
+## Apply Persistence
+   
+persistence = rips_simplex_tree.persistence(min_persistence=-1, persistence_dim_max=True)
+
+# Generate persistence diagrams
+diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000, title='Corr-Dist Mat Pers Diag')
+plt.savefig(pers_diags_dir+'gudhi_VR_pers_diagram.png')
+plt.close()
+
+os.sys.close()
+
