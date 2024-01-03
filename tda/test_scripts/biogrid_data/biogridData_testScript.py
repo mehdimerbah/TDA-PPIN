@@ -7,6 +7,7 @@
 # # Import packages and required functions
 print("Importing packages and required libraries...")
 import os
+import sys
 import pandas as pd
 import numpy as np
 import ripser
@@ -205,5 +206,5 @@ diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000, title
 plt.savefig(pers_diags_dir+'gudhi_VR_pers_diagram.png')
 plt.close()
 
-os.sys.close()
+sys.exit()
 

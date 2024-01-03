@@ -5,7 +5,10 @@
 
 # %% 
 # # Import packages and required functions
+print("Importing necessary packages and libraries...")
 import os
+import sys
+import warnings
 import pandas as pd
 import numpy as np
 import ripser
@@ -25,7 +28,7 @@ import itertools
 
 
 ## Set barcode directories to save plots
-
+print("Creating the necessary directories to save results and plots...")
 degree_dist_dir = os.path.join(os.path.dirname(__file__), 'plots/degree_dist/')
 if not os.path.isdir(degree_dist_dir):
     os.makedirs(degree_dist_dir)
@@ -73,7 +76,7 @@ def plot_barcode(diag, dim, plot_title, **kwargs):
 # %% 
 ## Create Network
 """RANDOMIZED Network construction based on a given edge presence probability"""
-
+print("Creating synthetic NetworkX PPI network...")
 # Initializing empty graph with the Networkx Package
 protein_network = nx.Graph()
 
@@ -94,6 +97,7 @@ for i, protein1 in enumerate(proteins):
 
 ## %% Adding Complexes
 # Creating protein complexes (connecting nodes within complexes with higher weights)
+print("Adding protein complexes to the network...")
 complex_1 = random.sample(proteins, 10)
 complex_2 = random.sample(proteins, 7)
 complex_3 = random.sample(proteins, 5)
@@ -156,7 +160,9 @@ np.fill_diagonal(pn_adjacency, 1)
 # %%
 ## Run the Vietoris-Rips filtrations on the adjacency matrix (maximum homology dimension is set to 3)
 ## This would not make too much sense as we should be feeding a distance measure between the nodes. Although we have a square matrix we are not on a metric space.
-pn_diagrams = ripser.ripser(pn_adjacency, distance_matrix=False, maxdim=3)['dgms']
+with warnings.catch_warnings(action="ignore"):
+    print("Computing Ripser persistence using adjacency matrix...") 
+    pn_diagrams = ripser.ripser(pn_adjacency, distance_matrix=False, maxdim=3)['dgms']
 
 # %% [markdown]
 # ## Using Correlation Distance Matrix
@@ -167,6 +173,7 @@ pn_distance_mat = 1 - pn_adjacency
 
 # %%
 ## PH with correlation distance matrix
+print("Computing Ripser persistence using Corr-Dist matrix...")
 dist_mat_diags_ripser = ripser.ripser(pn_distance_mat, distance_matrix=True, maxdim=3)['dgms']
 plot_diagrams(dist_mat_diags_ripser)
 plt.savefig(pers_diags_dir+'dist_mat_diags_ripser.png')
@@ -204,6 +211,7 @@ proteins_dict = {protein: idx for idx, protein in enumerate(proteins)}
 # Given protein-protein interaction network we can start by creating a simplex tree that includes all 0-simplices (nodes)
 
 # Construct a simplex tree from the network
+print("Constructing a Simplex tree from network nodes...")
 simplex_tree = gd.SimplexTree()
 
 for edge in protein_network.edges(data=True):
@@ -222,15 +230,18 @@ for edge in protein_network.edges(data=True):
 # Compute persistence diagrams
 ## NOTE: min_persistence is set to -1 to view all the simplex values (Include all 0-simplices)
 
+print("Computing persistence on simplex tree...")
 persistence = simplex_tree.persistence(min_persistence=-1, persistence_dim_max=False)
 
-# Generate persistence diagrams
-diagrams = gd.plot_persistence_diagram(persistence)
-plt.savefig(pers_diags_dir+'gudhi_pers_diag.png')
-barcode = gd.plot_persistence_barcode(persistence)
-plt.savefig(barcode_diags_dir+'gudhi_barcode_diag.png')
-density = gd.plot_persistence_density(persistence)
-plt.savefig('plots/dummy_data/guhdi_density_plot.png')
+print("Saving persistence plots on Simplex Tree...")
+with warnings.catch_warnings(action="ignore"): 
+    # Generate persistence diagrams
+    diagrams = gd.plot_persistence_diagram(persistence)
+    plt.savefig(pers_diags_dir+'gudhi_pers_diag.png')
+    barcode = gd.plot_persistence_barcode(persistence)
+    plt.savefig(barcode_diags_dir+'gudhi_barcode_diag.png')
+    density = gd.plot_persistence_density(persistence)
+    plt.savefig('plots/gudhi_density_plot.png')
 
 # %% [markdown]
 # ## GUDHI RipsComplex Construction
@@ -238,26 +249,33 @@ plt.savefig('plots/dummy_data/guhdi_density_plot.png')
 # %%
 ## Here we use the Gudhi library to build the Rips complex and apply the homology.
 ## We can build the Rips simplicial complex by using a distance matrix. So I just plugged in the correlation distance matrix.
+print("Constructing GUDHI Rips Complex from Corr-Dist matrix...")
 rips_complex = gd.RipsComplex(distance_matrix=pn_distance_mat, max_edge_length=1.0)
 
 
 ## We now build a simplex tree to store the simplices
+print("Buidling Rips Complex simplex tree...")
 rips_simplex_tree = rips_complex.create_simplex_tree(max_dimension=3)
 
 
 ## Check how the complex looks like
-result_str = 'Rips complex is of dimension ' + repr(rips_simplex_tree.dimension()) + ' - ' + \
+result_str = '\n------ #### Rips complex is of dimension ' + repr(rips_simplex_tree.dimension()) + ' - ' + \
     repr(rips_simplex_tree.num_simplices()) + ' simplices - ' + \
-    repr(rips_simplex_tree.num_vertices()) + ' vertices.'
+    repr(rips_simplex_tree.num_vertices()) + ' vertices. #### ------\n'
 
 print(result_str)
 
 # %%
+print("Computing persistence on Rips Simplex Tree...")
 persistence = rips_simplex_tree.persistence(min_persistence=-1, persistence_dim_max=True)
 
 # %%
 # Generate persistence diagrams
+print("Saving persistence diagrams on Rips Simplex Tree...")
 diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000)
 plt.savefig(pers_diags_dir+'gudhi_VR_pers_diag.png')
 plt.close()
 
+
+print("Script finished executing!")
+sys.exit()
