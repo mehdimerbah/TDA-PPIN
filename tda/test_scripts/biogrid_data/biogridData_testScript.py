@@ -209,8 +209,27 @@ persistence = rips_simplex_tree.persistence(min_persistence=-1, persistence_dim_
 # Generate persistence diagrams
 print("Saving Rips Simplex Tree persistence diagrams...")
 diagrams = gd.plot_persistence_diagram(persistence, max_intervals=4000000, title='Corr-Dist Mat Pers Diag')
-plt.savefig(pers_diags_dir+'gudhi_VR_pers_diagram.png')
+plt.savefig(pers_diags_dir+'gudhi_VR_pers_diagrams.png')
 plt.close()
+
+
+# %% 
+# Extracting the relavant persistent features 
+def extract_pers_feat_in_dim(persistence_list, dim, birth_max, death_min):
+    pers_feat = []
+    for pt in persistence_list:
+        pt_dim = pt[0]
+        birth = pt[1][0]
+        death = pt[1][1]
+        if pt_dim == dim and birth < birth_max and death > death_min:
+            pers_feat.append(list(pt[1]))
+    return pers_feat
+
+# %%
+# Creating embeddings into persistence landscapes for persistent homology features
+
+pers_LS = gd.representations.Landscape(num_landscapes = 5).fit_transform(dist_mat_diags_ripser[1])
+
 
 
 
