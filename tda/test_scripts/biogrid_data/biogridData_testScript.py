@@ -147,7 +147,7 @@ def plot_barcode(diag, dim, plot_title, **kwargs):
     plt.close()
 
 print("Creating Adjacency Matrix fro the protein network...")
-pn_adjacency = nwx.adjacency_matrix(biogrid_protein_net).toarray()
+pn_adjacency = nwx.adjacency_matrix(biogrid_protein_net, weight='SemSim').toarray()
 np.fill_diagonal(pn_adjacency, 1)
 print("Creating Corr-Distance Matrix from Adjacency Matrix...")
 pn_dist_mat = 1 - pn_adjacency
