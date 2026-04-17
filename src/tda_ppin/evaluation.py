@@ -83,6 +83,29 @@ def build_protein_feature_table(graph: nx.Graph, complexes: list[list[str]]) -> 
     return pd.DataFrame.from_records(rows).sort_values(by="protein").reset_index(drop=True)
 
 
+def build_bounded_ego_subgraph(
+    graph: nx.Graph,
+    protein: str,
+    *,
+    max_nodes: int,
+) -> nx.Graph:
+    ego_graph = nx.ego_graph(graph, protein)
+    if ego_graph.number_of_nodes() <= max_nodes:
+        return ego_graph.copy()
+
+    weighted_neighbors = sorted(
+        (
+            (neighbor, float(graph[protein][neighbor].get("SemSim", 0.0)))
+            for neighbor in graph.neighbors(protein)
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    selected_neighbors = [neighbor for neighbor, _ in weighted_neighbors[: max_nodes - 1]]
+    selected_nodes = [protein, *selected_neighbors]
+    return graph.subgraph(selected_nodes).copy()
+
+
 def build_subgraph_feature_record(
     graph: nx.Graph,
     members: list[str],
@@ -92,6 +115,8 @@ def build_subgraph_feature_record(
     label: int,
     ph_node_cap: int | None = None,
     ph_sampling_seed: int = 7,
+    filtration: str = "correlation_distance",
+    ph_feature_prefix: str | None = None,
 ) -> dict[str, float | int | str] | None:
     unique_members = [node for node in dict.fromkeys(members) if node in graph]
     if len(unique_members) == 0:
@@ -111,7 +136,13 @@ def build_subgraph_feature_record(
         if ph_node_cap is not None and subgraph.number_of_nodes() > ph_node_cap
         else subgraph
     )
-    ph_summary = summarize_graph_persistent_homology(ph_graph)
+    ph_summary = summarize_graph_persistent_homology(ph_graph, filtration=filtration)
+    if ph_feature_prefix is not None:
+        ph_summary = {
+            f"{ph_feature_prefix}_{key}" if key.startswith("ph_") else key: value
+            for key, value in ph_summary.items()
+        }
+
     record: dict[str, float | int | str] = {
         "subgraph_id": subgraph_id,
         "source": source,
@@ -137,6 +168,8 @@ def build_complex_subgraph_feature_table(
     min_complex_size: int = 3,
     ph_node_cap: int | None = None,
     ph_sampling_seed: int = 7,
+    filtration: str = "correlation_distance",
+    ph_feature_prefix: str | None = None,
 ) -> pd.DataFrame:
     rows: list[dict[str, float | int | str]] = []
     for index, complex_members in enumerate(complexes):
@@ -151,6 +184,8 @@ def build_complex_subgraph_feature_table(
             label=1 if source_label == "real_complex" else 0,
             ph_node_cap=ph_node_cap,
             ph_sampling_seed=ph_sampling_seed + index,
+            filtration=filtration,
+            ph_feature_prefix=ph_feature_prefix,
         )
         if record is not None:
             rows.append(record)
