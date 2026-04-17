@@ -48,6 +48,89 @@ def compute_ripser_diagrams(corr_distance_matrix: np.ndarray, maxdim: int = 3) -
     )["dgms"]
 
 
+def summarize_ripser_diagrams(diagrams: list[np.ndarray]) -> dict[str, float]:
+    summary: dict[str, float] = {}
+    for dimension in range(3):
+        diag = diagrams[dimension] if dimension < len(diagrams) else np.empty((0, 2))
+        count = float(len(diag))
+        if count == 0:
+            summary[f"ph_dim{dimension}_count"] = 0.0
+            summary[f"ph_dim{dimension}_finite_count"] = 0.0
+            summary[f"ph_dim{dimension}_mean_lifetime"] = 0.0
+            summary[f"ph_dim{dimension}_max_lifetime"] = 0.0
+            summary[f"ph_dim{dimension}_total_persistence"] = 0.0
+            continue
+
+        births = diag[:, 0]
+        deaths = diag[:, 1]
+        lifetimes = deaths - births
+        finite_lifetimes = lifetimes[np.isfinite(lifetimes)]
+        summary[f"ph_dim{dimension}_count"] = count
+        summary[f"ph_dim{dimension}_finite_count"] = float(len(finite_lifetimes))
+        summary[f"ph_dim{dimension}_mean_lifetime"] = (
+            float(np.mean(finite_lifetimes)) if len(finite_lifetimes) else 0.0
+        )
+        summary[f"ph_dim{dimension}_max_lifetime"] = (
+            float(np.max(finite_lifetimes)) if len(finite_lifetimes) else 0.0
+        )
+        summary[f"ph_dim{dimension}_total_persistence"] = (
+            float(np.sum(finite_lifetimes)) if len(finite_lifetimes) else 0.0
+        )
+
+    if len(diagrams) > 1 and len(diagrams[1]) > 0:
+        landscape = gd.representations.Landscape(num_landscapes=5).fit_transform([diagrams[1]])
+        summary["ph_dim1_landscape_l1"] = float(np.abs(landscape).sum())
+        summary["ph_dim1_landscape_max"] = float(np.max(landscape))
+    else:
+        summary["ph_dim1_landscape_l1"] = 0.0
+        summary["ph_dim1_landscape_max"] = 0.0
+    return summary
+
+
+def summarize_graph_persistent_homology(
+    graph: nx.Graph,
+    *,
+    maxdim: int = 3,
+) -> dict[str, float]:
+    if graph.number_of_nodes() <= 1:
+        summary = summarize_ripser_diagrams([])
+        summary["num_nodes"] = float(graph.number_of_nodes())
+        summary["num_edges"] = float(graph.number_of_edges())
+        summary["distance_matrix_mean"] = 0.0
+        summary["distance_matrix_std"] = 0.0
+        return summary
+
+    _, corr_distance = adjacency_and_corr_distance(graph)
+    diagrams = compute_ripser_diagrams(corr_distance, maxdim=maxdim)
+    summary = summarize_ripser_diagrams(diagrams)
+    summary["num_nodes"] = float(graph.number_of_nodes())
+    summary["num_edges"] = float(graph.number_of_edges())
+    summary["distance_matrix_mean"] = float(np.mean(corr_distance))
+    summary["distance_matrix_std"] = float(np.std(corr_distance))
+    return summary
+
+
+def sample_graph_for_ph(
+    graph: nx.Graph,
+    *,
+    max_nodes: int,
+    seed: int = 7,
+    preserve_hubs: int = 10,
+) -> nx.Graph:
+    if graph.number_of_nodes() <= max_nodes:
+        return graph.copy()
+
+    rng = np.random.default_rng(seed)
+    degree_sorted = sorted(graph.degree(), key=lambda item: item[1], reverse=True)
+    hub_nodes = [node for node, _ in degree_sorted[: min(preserve_hubs, max_nodes)]]
+    remaining_slots = max_nodes - len(hub_nodes)
+    remaining_nodes = [node for node in graph.nodes if node not in hub_nodes]
+    sampled_nodes = hub_nodes
+    if remaining_slots > 0:
+        sampled_nodes.extend(rng.choice(remaining_nodes, size=remaining_slots, replace=False).tolist())
+    return graph.subgraph(sampled_nodes).copy()
+
+
 def run_persistent_homology(
     adjacency_matrix: np.ndarray,
     corr_distance_matrix: np.ndarray,

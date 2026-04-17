@@ -1,0 +1,200 @@
+{
+  "config": {
+    "density_tolerance": 0.15,
+    "edge_subsample_fraction": 0.9,
+    "global_ph_node_cap": 120,
+    "hub_removal_fraction": 0.01,
+    "matched_random_per_complex": 1,
+    "max_complex_size": 25,
+    "max_random_attempts": 80,
+    "max_real_complexes": 40,
+    "min_complex_size": 3,
+    "node_subsample_fraction": 0.9,
+    "random_seed": 7,
+    "random_walk_restart_prob": 0.15,
+    "repeats": 2,
+    "subgraph_ph_node_cap": 60,
+    "test_fraction": 0.25,
+    "weight_jitter_std": 0.05
+  },
+  "decision": {
+    "baseline_complex_auroc": 0.96,
+    "combined_complex_auroc": 0.99,
+    "coverage_ok": true,
+    "mean_cosine_to_original": 0.9774484122607657,
+    "null_complex_auroc": 0.5632891414141414,
+    "ph_complex_auroc": 0.9450000000000001,
+    "verdict": "conditional_go"
+  },
+  "experiments": {
+    "complex_vs_random": {
+      "baseline_columns": [
+        "num_nodes",
+        "num_edges",
+        "density",
+        "mean_degree",
+        "mean_strength",
+        "mean_clustering",
+        "num_connected_components"
+      ],
+      "baseline_model": {
+        "auroc_values": [
+          0.95,
+          0.97
+        ],
+        "average_precision_values": [
+          0.9614285714285714,
+          0.976923076923077
+        ],
+        "mean_auroc": 0.96,
+        "mean_average_precision": 0.9691758241758242
+      },
+      "combined_model": {
+        "auroc_values": [
+          0.99,
+          0.99
+        ],
+        "average_precision_values": [
+          0.990909090909091,
+          0.990909090909091
+        ],
+        "mean_auroc": 0.99,
+        "mean_average_precision": 0.990909090909091
+      },
+      "max_complex_size": 25,
+      "max_real_complexes": 40,
+      "num_random_subgraphs": 40,
+      "num_real_subgraphs": 40,
+      "ph_columns": [
+        "ph_dim0_count",
+        "ph_dim0_finite_count",
+        "ph_dim0_max_lifetime",
+        "ph_dim0_mean_lifetime",
+        "ph_dim0_total_persistence",
+        "ph_dim1_count",
+        "ph_dim1_finite_count",
+        "ph_dim1_landscape_l1",
+        "ph_dim1_landscape_max",
+        "ph_dim1_max_lifetime",
+        "ph_dim1_mean_lifetime",
+        "ph_dim1_total_persistence",
+        "ph_dim2_count",
+        "ph_dim2_finite_count",
+        "ph_dim2_max_lifetime",
+        "ph_dim2_mean_lifetime",
+        "ph_dim2_total_persistence",
+        "ph_num_nodes_used"
+      ],
+      "ph_model": {
+        "auroc_values": [
+          0.98,
+          0.91
+        ],
+        "average_precision_values": [
+          0.9833333333333334,
+          0.9194230769230769
+        ],
+        "mean_auroc": 0.9450000000000001,
+        "mean_average_precision": 0.9513782051282051
+      }
+    },
+    "data_sanity": {
+      "fraction_fully_covered_complexes": 0.9546313799621928,
+      "mean_complex_size": 4.323629489603024,
+      "mean_degree_in_complex": 95.81094808126412,
+      "mean_degree_outside_complex": 23.831771750616415,
+      "median_complex_size": 3.0,
+      "num_complexes": 2645.0,
+      "num_fully_covered_complexes": 2525.0,
+      "num_graph_edges": 338923.0,
+      "num_graph_nodes": 17739.0
+    },
+    "global_ph_stability": {
+      "global_ph_node_cap": 120,
+      "mean_cosine_to_original": 0.9774484122607657,
+      "min_cosine_to_original": 0.9135528425483348,
+      "summary_keys": [
+        "ph_dim0_count",
+        "ph_dim0_finite_count",
+        "ph_dim0_max_lifetime",
+        "ph_dim0_mean_lifetime",
+        "ph_dim0_total_persistence",
+        "ph_dim1_count",
+        "ph_dim1_finite_count",
+        "ph_dim1_landscape_l1",
+        "ph_dim1_landscape_max",
+        "ph_dim1_max_lifetime",
+        "ph_dim1_mean_lifetime",
+        "ph_dim1_total_persistence",
+        "ph_dim2_count",
+        "ph_dim2_finite_count",
+        "ph_dim2_max_lifetime",
+        "ph_dim2_mean_lifetime",
+        "ph_dim2_total_persistence"
+      ]
+    },
+    "null_controls": {
+      "complex_label_shuffle": {
+        "auroc_values": [
+          0.5104166666666666,
+          0.6161616161616161
+        ],
+        "average_precision_values": [
+          0.6593490938885674,
+          0.7099548112706007
+        ],
+        "mean_auroc": 0.5632891414141414,
+        "mean_average_precision": 0.684651952579584
+      },
+      "protein_label_shuffle": {
+        "auroc_values": [
+          0.494865978894143,
+          0.4985221612158829
+        ],
+        "average_precision_values": [
+          0.19712487797685355,
+          0.20070167964187943
+        ],
+        "mean_auroc": 0.496694070055013,
+        "mean_average_precision": 0.1989132788093665
+      }
+    },
+    "protein_baseline": {
+      "baseline_model": {
+        "auroc_values": [
+          0.8261787619495129,
+          0.8434861811215577
+        ],
+        "average_precision_values": [
+          0.5567654846314645,
+          0.5967435896745285
+        ],
+        "mean_auroc": 0.8348324715355353,
+        "mean_average_precision": 0.5767545371529965
+      },
+      "feature_columns": [
+        "degree",
+        "strength",
+        "clustering",
+        "ego_nodes",
+        "ego_edges",
+        "local_density"
+      ],
+      "num_negative_proteins": 14195,
+      "num_positive_proteins": 3544
+    }
+  },
+  "inputs": {
+    "complexes": "data/CORUM_Human_Complexes.txt",
+    "ppi": "data/Human_PPI_Network.txt"
+  },
+  "outputs": {
+    "complex_vs_random_features": "results/processed/biogrid_decision_stage/complex_vs_random_features.csv",
+    "global_ph_stability": "results/processed/biogrid_decision_stage/global_ph_stability.csv",
+    "processed_dir": "results/processed/biogrid_decision_stage",
+    "protein_feature_table": "results/processed/biogrid_decision_stage/protein_feature_table.csv",
+    "protein_univariate_signal": "results/processed/biogrid_decision_stage/protein_univariate_signal.csv"
+  },
+  "run_name": "biogrid_decision_stage",
+  "timestamp_utc": "2026-04-16T13:39:23.050270+00:00"
+}
