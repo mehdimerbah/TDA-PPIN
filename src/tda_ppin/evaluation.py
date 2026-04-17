@@ -9,6 +9,13 @@ import pandas as pd
 from .ph import sample_graph_for_ph, summarize_graph_persistent_homology
 from .stats import binary_auroc
 
+SUPPORTED_LOCAL_NEIGHBORHOODS = (
+    "top_weighted_neighbors",
+    "ego_radius_1",
+    "ego_radius_2",
+    "seed_expansion",
+)
+
 
 def _safe_weighted_clustering(graph: nx.Graph) -> dict[str, float]:
     if graph.number_of_edges() == 0:
@@ -89,6 +96,55 @@ def build_bounded_ego_subgraph(
     *,
     max_nodes: int,
 ) -> nx.Graph:
+    return build_local_neighborhood_subgraph(
+        graph,
+        protein,
+        method="top_weighted_neighbors",
+        max_nodes=max_nodes,
+    )
+
+
+def build_local_neighborhood_subgraph(
+    graph: nx.Graph,
+    protein: str,
+    *,
+    method: str,
+    max_nodes: int,
+) -> nx.Graph:
+    if protein not in graph:
+        raise ValueError(f"Protein '{protein}' is not present in the graph.")
+    if max_nodes < 1:
+        raise ValueError("max_nodes must be at least 1.")
+    if method not in SUPPORTED_LOCAL_NEIGHBORHOODS:
+        raise ValueError(
+            f"Unsupported neighborhood method '{method}'. Expected one of {SUPPORTED_LOCAL_NEIGHBORHOODS}."
+        )
+
+    if method == "top_weighted_neighbors":
+        return _top_weighted_neighbor_subgraph(graph, protein, max_nodes=max_nodes)
+    if method == "seed_expansion":
+        return _seed_expansion_subgraph(graph, protein, max_nodes=max_nodes)
+
+    radius = 1 if method == "ego_radius_1" else 2
+    ego_graph = nx.ego_graph(graph, protein, radius=radius)
+    if ego_graph.number_of_nodes() <= max_nodes:
+        return ego_graph.copy()
+
+    selected_nodes = _select_seed_prioritized_nodes(
+        graph,
+        protein,
+        candidate_nodes=list(ego_graph.nodes()),
+        max_nodes=max_nodes,
+    )
+    return graph.subgraph(selected_nodes).copy()
+
+
+def _top_weighted_neighbor_subgraph(
+    graph: nx.Graph,
+    protein: str,
+    *,
+    max_nodes: int,
+) -> nx.Graph:
     ego_graph = nx.ego_graph(graph, protein)
     if ego_graph.number_of_nodes() <= max_nodes:
         return ego_graph.copy()
@@ -104,6 +160,97 @@ def build_bounded_ego_subgraph(
     selected_neighbors = [neighbor for neighbor, _ in weighted_neighbors[: max_nodes - 1]]
     selected_nodes = [protein, *selected_neighbors]
     return graph.subgraph(selected_nodes).copy()
+
+
+def _seed_expansion_subgraph(
+    graph: nx.Graph,
+    protein: str,
+    *,
+    max_nodes: int,
+) -> nx.Graph:
+    selected = [protein]
+    selected_set = {protein}
+    frontier = {neighbor for neighbor in graph.neighbors(protein)}
+
+    while frontier and len(selected) < max_nodes:
+        next_node = max(
+            frontier,
+            key=lambda node: (
+                _best_edge_weight_to_selected(graph, node, selected_set),
+                _node_strength(graph, node),
+                str(node),
+            ),
+        )
+        frontier.remove(next_node)
+        if next_node in selected_set:
+            continue
+        selected.append(next_node)
+        selected_set.add(next_node)
+        frontier.update(neighbor for neighbor in graph.neighbors(next_node) if neighbor not in selected_set)
+
+    return graph.subgraph(selected).copy()
+
+
+def _select_seed_prioritized_nodes(
+    graph: nx.Graph,
+    protein: str,
+    *,
+    candidate_nodes: list[str],
+    max_nodes: int,
+) -> list[str]:
+    if protein not in candidate_nodes:
+        candidate_nodes = [protein, *candidate_nodes]
+
+    candidate_set = set(candidate_nodes)
+    lengths = nx.single_source_shortest_path_length(graph.subgraph(candidate_nodes), protein)
+    ranked_nodes = sorted(
+        (node for node in candidate_nodes if node != protein),
+        key=lambda node: (
+            lengths.get(node, np.inf),
+            -_best_edge_weight_to_inner_shell(graph, node, candidate_set, lengths),
+            -_node_strength(graph, node),
+            str(node),
+        ),
+    )
+    return [protein, *ranked_nodes[: max_nodes - 1]]
+
+
+def _best_edge_weight_to_selected(
+    graph: nx.Graph,
+    node: str,
+    selected_nodes: set[str],
+) -> float:
+    return max(
+        (
+            float(graph[node][neighbor].get("SemSim", 0.0))
+            for neighbor in graph.neighbors(node)
+            if neighbor in selected_nodes
+        ),
+        default=0.0,
+    )
+
+
+def _best_edge_weight_to_inner_shell(
+    graph: nx.Graph,
+    node: str,
+    candidate_nodes: set[str],
+    lengths: dict[str, int],
+) -> float:
+    node_length = lengths.get(node, 10**9)
+    return max(
+        (
+            float(graph[node][neighbor].get("SemSim", 0.0))
+            for neighbor in graph.neighbors(node)
+            if neighbor in candidate_nodes and lengths.get(neighbor, 10**9) < node_length
+        ),
+        default=0.0,
+    )
+
+
+def _node_strength(graph: nx.Graph, node: str) -> float:
+    return float(
+        sum(edge_data.get("SemSim", 1.0) for _, _, edge_data in graph.edges(node, data=True))
+    )
 
 
 def build_subgraph_feature_record(

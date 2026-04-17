@@ -9,6 +9,7 @@ import pandas as pd
 from .evaluation import (
     build_bounded_ego_subgraph,
     build_complex_subgraph_feature_table,
+    build_local_neighborhood_subgraph,
     build_membership_lookup,
     build_protein_feature_table,
     build_subgraph_feature_record,
@@ -61,6 +62,24 @@ class ExtensionExplorationConfig:
     filtration_max_complex_size: int = 25
     filtration_subgraph_ph_node_cap: int = 60
     filtration_random_walk_restart_prob: float = 0.15
+
+
+@dataclass(frozen=True)
+class LocalProtocolSweepConfig:
+    random_seed: int = 7
+    local_positive_proteins: int = 150
+    local_negative_proteins: int = 150
+    protocols: tuple[str, ...] = (
+        "top_weighted_neighbors",
+        "ego_radius_1",
+        "ego_radius_2",
+        "seed_expansion",
+    )
+    neighborhood_node_caps: tuple[int, ...] = (10, 20, 30, 50)
+    filtration: str = "weighted_shortest_path"
+    ph_maxdim: int = 2
+    repeats: int = 4
+    test_fraction: float = 0.25
 
 
 def run_data_sanity_experiment(graph: nx.Graph, complexes: list[list[str]]) -> dict[str, float]:
@@ -553,6 +572,172 @@ def run_filtration_comparison_experiment(
     return metric_table, report
 
 
+def run_local_protocol_sweep_experiment(
+    graph: nx.Graph,
+    protein_feature_table: pd.DataFrame,
+    config: LocalProtocolSweepConfig,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    sampled_feature_table = _sample_protein_panel(protein_feature_table, config)
+    baseline_columns = [
+        "degree",
+        "strength",
+        "clustering",
+        "ego_nodes",
+        "ego_edges",
+        "local_density",
+    ]
+    baseline_metrics = repeated_split_logistic_metrics(
+        sampled_feature_table[baseline_columns].fillna(0.0).to_numpy(),
+        sampled_feature_table["protein_in_any_complex"].to_numpy(),
+        repeats=config.repeats,
+        test_fraction=config.test_fraction,
+        seed=config.random_seed,
+    )
+
+    feature_tables: list[pd.DataFrame] = []
+    metric_rows: list[dict[str, float | int | str]] = [
+        {
+            "experiment": "local_protocol_sweep",
+            "protocol": "baseline_only",
+            "max_nodes": 0,
+            "filtration": config.filtration,
+            "model": "baseline_only",
+            "mean_auroc": float(baseline_metrics["mean_auroc"]),
+            "mean_average_precision": float(baseline_metrics["mean_average_precision"]),
+            "auroc_lift_vs_baseline": 0.0,
+        }
+    ]
+    report: dict[str, object] = {
+        "num_sampled_proteins": int(len(sampled_feature_table)),
+        "num_positive_proteins": int(sampled_feature_table["protein_in_any_complex"].sum()),
+        "num_negative_proteins": int(len(sampled_feature_table) - sampled_feature_table["protein_in_any_complex"].sum()),
+        "baseline_model": baseline_metrics,
+        "filtration": config.filtration,
+        "protocols": {},
+    }
+    best_setting: dict[str, object] | None = None
+
+    for protocol in config.protocols:
+        for max_nodes in config.neighborhood_node_caps:
+            rows: list[dict[str, float | int | str]] = []
+            for index, row in sampled_feature_table.reset_index(drop=True).iterrows():
+                protein = str(row["protein"])
+                neighborhood = build_local_neighborhood_subgraph(
+                    graph,
+                    protein,
+                    method=protocol,
+                    max_nodes=max_nodes,
+                )
+                record = row.to_dict()
+                record["protocol"] = protocol
+                record["max_nodes"] = int(max_nodes)
+                record["filtration"] = config.filtration
+                record["local_nodes_used"] = int(neighborhood.number_of_nodes())
+                record["local_edges_used"] = int(neighborhood.number_of_edges())
+                ph_summary = summarize_graph_persistent_homology(
+                    neighborhood,
+                    maxdim=config.ph_maxdim,
+                    filtration=config.filtration,
+                )
+                for key, value in ph_summary.items():
+                    if key.startswith("ph_"):
+                        record[f"local_{key}"] = value
+                rows.append(record)
+
+            setting_table = pd.DataFrame.from_records(rows)
+            feature_tables.append(setting_table)
+            ph_columns = sorted(column for column in setting_table.columns if column.startswith("local_ph_"))
+            labels = setting_table["protein_in_any_complex"].to_numpy()
+            ph_metrics = repeated_split_logistic_metrics(
+                setting_table[ph_columns].fillna(0.0).to_numpy(),
+                labels,
+                repeats=config.repeats,
+                test_fraction=config.test_fraction,
+                seed=config.random_seed + len(metric_rows),
+            )
+            combined_metrics = repeated_split_logistic_metrics(
+                setting_table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+                labels,
+                repeats=config.repeats,
+                test_fraction=config.test_fraction,
+                seed=config.random_seed + len(metric_rows) + 40,
+            )
+            shuffled_labels = labels.copy()
+            np.random.default_rng(config.random_seed + len(metric_rows) + 80).shuffle(shuffled_labels)
+            null_metrics = repeated_split_logistic_metrics(
+                setting_table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+                shuffled_labels,
+                repeats=config.repeats,
+                test_fraction=config.test_fraction,
+                seed=config.random_seed + len(metric_rows) + 120,
+            )
+
+            combined_lift = float(combined_metrics["mean_auroc"]) - float(baseline_metrics["mean_auroc"])
+            key = f"{protocol}__nodes_{max_nodes}"
+            report["protocols"][key] = {
+                "protocol": protocol,
+                "max_nodes": int(max_nodes),
+                "ph_only": ph_metrics,
+                "baseline_plus_ph": combined_metrics,
+                "label_shuffle_null": null_metrics,
+                "num_ph_features": len(ph_columns),
+                "auroc_lift_vs_baseline": combined_lift,
+            }
+            metric_rows.append(
+                {
+                    "experiment": "local_protocol_sweep",
+                    "protocol": protocol,
+                    "max_nodes": int(max_nodes),
+                    "filtration": config.filtration,
+                    "model": "ph_only",
+                    "mean_auroc": float(ph_metrics["mean_auroc"]),
+                    "mean_average_precision": float(ph_metrics["mean_average_precision"]),
+                    "auroc_lift_vs_baseline": float(ph_metrics["mean_auroc"]) - float(baseline_metrics["mean_auroc"]),
+                }
+            )
+            metric_rows.append(
+                {
+                    "experiment": "local_protocol_sweep",
+                    "protocol": protocol,
+                    "max_nodes": int(max_nodes),
+                    "filtration": config.filtration,
+                    "model": "baseline_plus_ph",
+                    "mean_auroc": float(combined_metrics["mean_auroc"]),
+                    "mean_average_precision": float(combined_metrics["mean_average_precision"]),
+                    "auroc_lift_vs_baseline": combined_lift,
+                }
+            )
+            metric_rows.append(
+                {
+                    "experiment": "local_protocol_sweep",
+                    "protocol": protocol,
+                    "max_nodes": int(max_nodes),
+                    "filtration": config.filtration,
+                    "model": "label_shuffle_null",
+                    "mean_auroc": float(null_metrics["mean_auroc"]),
+                    "mean_average_precision": float(null_metrics["mean_average_precision"]),
+                    "auroc_lift_vs_baseline": float(null_metrics["mean_auroc"]) - float(baseline_metrics["mean_auroc"]),
+                }
+            )
+
+            if best_setting is None or combined_lift > float(best_setting["auroc_lift_vs_baseline"]):
+                best_setting = {
+                    "protocol": protocol,
+                    "max_nodes": int(max_nodes),
+                    "filtration": config.filtration,
+                    "auroc_lift_vs_baseline": combined_lift,
+                    "combined_mean_auroc": float(combined_metrics["mean_auroc"]),
+                    "null_mean_auroc": float(null_metrics["mean_auroc"]),
+                }
+
+    report["best_setting"] = best_setting
+    return (
+        pd.concat(feature_tables, ignore_index=True),
+        pd.DataFrame.from_records(metric_rows),
+        report,
+    )
+
+
 def _matched_random_subgraph_table(
     graph: nx.Graph,
     complexes: list[list[str]],
@@ -840,7 +1025,7 @@ def _shuffle_labels_within_bins(
 
 def _sample_protein_panel(
     protein_feature_table: pd.DataFrame,
-    config: ExtensionExplorationConfig,
+    config: ExtensionExplorationConfig | LocalProtocolSweepConfig,
 ) -> pd.DataFrame:
     rng = np.random.default_rng(config.random_seed)
     positive = protein_feature_table[protein_feature_table["protein_in_any_complex"] == 1]
@@ -895,5 +1080,7 @@ def _remove_hubs(graph: nx.Graph, config: DecisionStageConfig) -> nx.Graph:
     return perturbed
 
 
-def config_to_dict(config: DecisionStageConfig) -> dict[str, object]:
+def config_to_dict(
+    config: DecisionStageConfig | ExtensionExplorationConfig | LocalProtocolSweepConfig,
+) -> dict[str, object]:
     return asdict(config)
