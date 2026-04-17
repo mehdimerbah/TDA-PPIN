@@ -1,0 +1,337 @@
+{
+  "config": {
+    "filtration_matched_random_per_complex": 1,
+    "filtration_max_complex_size": 25,
+    "filtration_max_random_attempts": 80,
+    "filtration_max_real_complexes": 40,
+    "filtration_min_complex_size": 3,
+    "filtration_random_walk_restart_prob": 0.15,
+    "filtration_repeats": 3,
+    "filtration_subgraph_ph_node_cap": 60,
+    "filtration_test_fraction": 0.25,
+    "filtrations": [
+      "correlation_distance",
+      "hop_distance",
+      "weighted_shortest_path"
+    ],
+    "local_negative_proteins": 100,
+    "local_neighborhood_node_cap": 30,
+    "local_ph_maxdim": 2,
+    "local_positive_proteins": 100,
+    "local_repeats": 3,
+    "local_test_fraction": 0.25,
+    "random_seed": 7
+  },
+  "experiments": {
+    "filtration_comparison": {
+      "filtrations": {
+        "correlation_distance": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              1.0,
+              0.99,
+              1.0
+            ],
+            "average_precision_values": [
+              1.0,
+              0.990909090909091,
+              1.0
+            ],
+            "mean_auroc": 0.9966666666666667,
+            "mean_average_precision": 0.9969696969696971
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.5151515151515151,
+              0.5104166666666666,
+              0.69
+            ],
+            "average_precision_values": [
+              0.6814570018904383,
+              0.6427845088061807,
+              0.7084557547715442
+            ],
+            "mean_auroc": 0.5718560606060605,
+            "mean_average_precision": 0.6775657551560544
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              0.94,
+              0.97,
+              1.0
+            ],
+            "average_precision_values": [
+              0.9476301476301476,
+              0.9733333333333334,
+              1.0
+            ],
+            "mean_auroc": 0.9700000000000001,
+            "mean_average_precision": 0.9736544936544936
+          }
+        },
+        "hop_distance": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              0.98,
+              1.0,
+              1.0
+            ],
+            "average_precision_values": [
+              0.9833333333333334,
+              1.0,
+              1.0
+            ],
+            "mean_auroc": 0.9933333333333333,
+            "mean_average_precision": 0.9944444444444445
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.6060606060606061,
+              0.39,
+              0.68
+            ],
+            "average_precision_values": [
+              0.58835660526837,
+              0.5286113937661925,
+              0.717066261911463
+            ],
+            "mean_auroc": 0.5586868686868688,
+            "mean_average_precision": 0.6113447536486752
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              0.59,
+              0.64,
+              0.59
+            ],
+            "average_precision_values": [
+              0.7028619909502263,
+              0.762093592681828,
+              0.6984663865546219
+            ],
+            "mean_auroc": 0.6066666666666666,
+            "mean_average_precision": 0.7211406567288922
+          }
+        },
+        "weighted_shortest_path": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              0.93,
+              1.0,
+              0.99
+            ],
+            "average_precision_values": [
+              0.9464285714285715,
+              1.0,
+              0.990909090909091
+            ],
+            "mean_auroc": 0.9733333333333333,
+            "mean_average_precision": 0.9791125541125542
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.3125,
+              0.35353535353535354,
+              0.41414141414141414
+            ],
+            "average_precision_values": [
+              0.3282739829614829,
+              0.3972507521527129,
+              0.43845609393855006
+            ],
+            "mean_auroc": 0.3600589225589226,
+            "mean_average_precision": 0.3879936096842486
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              1.0,
+              0.92,
+              1.0
+            ],
+            "average_precision_values": [
+              1.0,
+              0.9373737373737374,
+              1.0
+            ],
+            "mean_auroc": 0.9733333333333333,
+            "mean_average_precision": 0.9791245791245791
+          }
+        }
+      },
+      "num_instance_rows": 80,
+      "num_random_controls": 40,
+      "num_real_complexes": 40
+    },
+    "local_neighborhood_ph": {
+      "baseline_model": {
+        "auroc_values": [
+          0.8456486042692939,
+          0.8486312399355878,
+          0.8798701298701299
+        ],
+        "average_precision_values": [
+          0.8967168818533326,
+          0.8818126238426311,
+          0.8490375793159571
+        ],
+        "mean_auroc": 0.8580499913583371,
+        "mean_average_precision": 0.8758556950039736
+      },
+      "filtrations": {
+        "correlation_distance": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              0.7772435897435898,
+              0.8477564102564102,
+              0.8
+            ],
+            "average_precision_values": [
+              0.8310118371748892,
+              0.8734881810196067,
+              0.7201305800609206
+            ],
+            "mean_auroc": 0.8083333333333332,
+            "mean_average_precision": 0.8082101994184722
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.4439102564102564,
+              0.34455128205128205,
+              0.3782051282051282
+            ],
+            "average_precision_values": [
+              0.4850004806524204,
+              0.42336151685192963,
+              0.42355703843573217
+            ],
+            "mean_auroc": 0.38888888888888884,
+            "mean_average_precision": 0.44397301198002737
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              0.733446519524618,
+              0.7963875205254516,
+              0.8686371100164204
+            ],
+            "average_precision_values": [
+              0.8389704206074431,
+              0.7729721319383345,
+              0.8779971703509968
+            ],
+            "mean_auroc": 0.7994903833554967,
+            "mean_average_precision": 0.829979907632258
+          }
+        },
+        "hop_distance": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              0.84,
+              0.825944170771757,
+              0.819376026272578
+            ],
+            "average_precision_values": [
+              0.7747058447845061,
+              0.7999579815145539,
+              0.7900308214790018
+            ],
+            "mean_auroc": 0.8284400656814449,
+            "mean_average_precision": 0.788231549259354
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.47435897435897434,
+              0.46215780998389694,
+              0.47783251231527096
+            ],
+            "average_precision_values": [
+              0.5661263296733637,
+              0.42495534194655454,
+              0.6256187078764528
+            ],
+            "mean_auroc": 0.47144976555271406,
+            "mean_average_precision": 0.5389001264987904
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              0.7294685990338164,
+              0.7963875205254516,
+              0.7181964573268921
+            ],
+            "average_precision_values": [
+              0.7850720253162633,
+              0.7089858493666928,
+              0.7429915763043072
+            ],
+            "mean_auroc": 0.74801752562872,
+            "mean_average_precision": 0.7456831503290878
+          }
+        },
+        "weighted_shortest_path": {
+          "baseline_plus_ph": {
+            "auroc_values": [
+              0.895330112721417,
+              0.8701298701298701,
+              0.9146141215106732
+            ],
+            "average_precision_values": [
+              0.92303998751535,
+              0.9099048231013744,
+              0.895773928022933
+            ],
+            "mean_auroc": 0.8933580347873201,
+            "mean_average_precision": 0.9095729128798857
+          },
+          "label_shuffle_null": {
+            "auroc_values": [
+              0.5714285714285714,
+              0.4967948717948718,
+              0.5535714285714286
+            ],
+            "average_precision_values": [
+              0.5377037049367134,
+              0.588842622227052,
+              0.5160304106550613
+            ],
+            "mean_auroc": 0.5405982905982906,
+            "mean_average_precision": 0.5475255792729422
+          },
+          "num_ph_features": 17,
+          "ph_only": {
+            "auroc_values": [
+              0.8208,
+              0.7278582930756844,
+              0.8493589743589743
+            ],
+            "average_precision_values": [
+              0.8529183562535398,
+              0.8252283876765358,
+              0.7828843028053721
+            ],
+            "mean_auroc": 0.7993390891448863,
+            "mean_average_precision": 0.8203436822451492
+          }
+        }
+      },
+      "num_negative_proteins": 100,
+      "num_positive_proteins": 100,
+      "num_sampled_proteins": 200
+    }
+  },
+  "inputs": {
+    "complexes": "data/CORUM_Human_Complexes.txt",
+    "ppi": "data/Human_PPI_Network.txt"
+  },
+  "outputs": {
+    "filtration_comparison_metrics": "results/processed/biogrid_local_filtration_exploration/filtration_comparison_metrics.csv",
+    "local_neighborhood_features": "results/processed/biogrid_local_filtration_exploration/local_neighborhood_features.csv",
+    "local_neighborhood_metrics": "results/processed/biogrid_local_filtration_exploration/local_neighborhood_metrics.csv",
+    "processed_dir": "results/processed/biogrid_local_filtration_exploration"
+  },
+  "run_name": "biogrid_local_filtration_exploration",
+  "timestamp_utc": "2026-04-16T13:55:51.199719+00:00"
+}

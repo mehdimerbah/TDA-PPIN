@@ -24,6 +24,13 @@ class PHArtifacts:
     rips_complex_summary: dict[str, int]
 
 
+SUPPORTED_FILTRATIONS = (
+    "correlation_distance",
+    "hop_distance",
+    "weighted_shortest_path",
+)
+
+
 def build_weighted_graph(ppi_df: pd.DataFrame) -> nx.Graph:
     return nx.from_pandas_edgelist(
         ppi_df,
@@ -38,6 +45,34 @@ def adjacency_and_corr_distance(graph: nx.Graph) -> tuple[np.ndarray, np.ndarray
     np.fill_diagonal(adjacency, 1.0)
     corr_distance = 1 - adjacency
     return adjacency, corr_distance
+
+
+def graph_to_distance_matrix(
+    graph: nx.Graph,
+    *,
+    filtration: str = "correlation_distance",
+) -> np.ndarray:
+    if filtration not in SUPPORTED_FILTRATIONS:
+        raise ValueError(f"Unsupported filtration '{filtration}'. Expected one of {SUPPORTED_FILTRATIONS}.")
+
+    node_list = list(graph.nodes())
+    if not node_list:
+        return np.zeros((0, 0))
+
+    if filtration == "correlation_distance":
+        _, corr_distance = adjacency_and_corr_distance(graph)
+        return corr_distance
+
+    if filtration == "hop_distance":
+        lengths = dict(nx.all_pairs_shortest_path_length(graph))
+        return _lengths_to_distance_matrix(node_list, lengths)
+
+    weighted_graph = graph.copy()
+    for _, _, data in weighted_graph.edges(data=True):
+        semsim = float(data.get("SemSim", 0.0))
+        data["edge_distance"] = max(1e-6, 1.0 - semsim)
+    lengths = dict(nx.all_pairs_dijkstra_path_length(weighted_graph, weight="edge_distance"))
+    return _lengths_to_distance_matrix(node_list, lengths)
 
 
 def compute_ripser_diagrams(corr_distance_matrix: np.ndarray, maxdim: int = 3) -> list[np.ndarray]:
@@ -91,6 +126,7 @@ def summarize_graph_persistent_homology(
     graph: nx.Graph,
     *,
     maxdim: int = 3,
+    filtration: str = "correlation_distance",
 ) -> dict[str, float]:
     if graph.number_of_nodes() <= 1:
         summary = summarize_ripser_diagrams([])
@@ -100,13 +136,13 @@ def summarize_graph_persistent_homology(
         summary["distance_matrix_std"] = 0.0
         return summary
 
-    _, corr_distance = adjacency_and_corr_distance(graph)
-    diagrams = compute_ripser_diagrams(corr_distance, maxdim=maxdim)
+    distance_matrix = graph_to_distance_matrix(graph, filtration=filtration)
+    diagrams = compute_ripser_diagrams(distance_matrix, maxdim=maxdim)
     summary = summarize_ripser_diagrams(diagrams)
     summary["num_nodes"] = float(graph.number_of_nodes())
     summary["num_edges"] = float(graph.number_of_edges())
-    summary["distance_matrix_mean"] = float(np.mean(corr_distance))
-    summary["distance_matrix_std"] = float(np.std(corr_distance))
+    summary["distance_matrix_mean"] = float(np.mean(distance_matrix))
+    summary["distance_matrix_std"] = float(np.std(distance_matrix))
     return summary
 
 
@@ -129,6 +165,26 @@ def sample_graph_for_ph(
     if remaining_slots > 0:
         sampled_nodes.extend(rng.choice(remaining_nodes, size=remaining_slots, replace=False).tolist())
     return graph.subgraph(sampled_nodes).copy()
+
+
+def _lengths_to_distance_matrix(
+    node_list: list[str],
+    lengths: dict[str, dict[str, float]],
+) -> np.ndarray:
+    index = {node: position for position, node in enumerate(node_list)}
+    distance_matrix = np.full((len(node_list), len(node_list)), np.inf, dtype=float)
+    np.fill_diagonal(distance_matrix, 0.0)
+
+    for source_node, target_lengths in lengths.items():
+        source_index = index[source_node]
+        for target_node, distance in target_lengths.items():
+            distance_matrix[source_index, index[target_node]] = float(distance)
+
+    finite_mask = np.isfinite(distance_matrix) & ~np.eye(len(node_list), dtype=bool)
+    finite_values = distance_matrix[finite_mask]
+    cap_value = float(np.max(finite_values) + 1.0) if finite_values.size else 1.0
+    distance_matrix[~np.isfinite(distance_matrix)] = cap_value
+    return distance_matrix
 
 
 def run_persistent_homology(

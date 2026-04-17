@@ -7,9 +7,11 @@ import numpy as np
 import pandas as pd
 
 from .evaluation import (
+    build_bounded_ego_subgraph,
+    build_complex_subgraph_feature_table,
     build_membership_lookup,
     build_protein_feature_table,
-    build_complex_subgraph_feature_table,
+    build_subgraph_feature_record,
     univariate_signal_summary,
 )
 from .ph import sample_graph_for_ph, summarize_graph_persistent_homology
@@ -34,6 +36,31 @@ class DecisionStageConfig:
     global_ph_node_cap: int = 250
     subgraph_ph_node_cap: int = 120
     random_walk_restart_prob: float = 0.15
+
+
+@dataclass(frozen=True)
+class ExtensionExplorationConfig:
+    random_seed: int = 7
+    local_positive_proteins: int = 100
+    local_negative_proteins: int = 100
+    local_neighborhood_node_cap: int = 30
+    local_ph_maxdim: int = 2
+    local_repeats: int = 3
+    local_test_fraction: float = 0.25
+    filtrations: tuple[str, ...] = (
+        "correlation_distance",
+        "hop_distance",
+        "weighted_shortest_path",
+    )
+    filtration_repeats: int = 3
+    filtration_test_fraction: float = 0.25
+    filtration_max_real_complexes: int = 40
+    filtration_matched_random_per_complex: int = 1
+    filtration_max_random_attempts: int = 80
+    filtration_min_complex_size: int = 3
+    filtration_max_complex_size: int = 25
+    filtration_subgraph_ph_node_cap: int = 60
+    filtration_random_walk_restart_prob: float = 0.15
 
 
 def run_data_sanity_experiment(graph: nx.Graph, complexes: list[list[str]]) -> dict[str, float]:
@@ -286,6 +313,246 @@ def synthesize_decision(
     }
 
 
+def run_local_neighborhood_ph_experiment(
+    graph: nx.Graph,
+    protein_feature_table: pd.DataFrame,
+    config: ExtensionExplorationConfig,
+) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, object]]:
+    sampled_feature_table = _sample_protein_panel(protein_feature_table, config)
+    baseline_columns = [
+        "degree",
+        "strength",
+        "clustering",
+        "ego_nodes",
+        "ego_edges",
+        "local_density",
+    ]
+    rows: list[dict[str, float | int | str]] = []
+    for index, row in sampled_feature_table.reset_index(drop=True).iterrows():
+        protein = str(row["protein"])
+        neighborhood = build_bounded_ego_subgraph(
+            graph,
+            protein,
+            max_nodes=config.local_neighborhood_node_cap,
+        )
+        record = row.to_dict()
+        record["local_nodes_used"] = int(neighborhood.number_of_nodes())
+        record["local_edges_used"] = int(neighborhood.number_of_edges())
+        for filtration in config.filtrations:
+            ph_summary = summarize_graph_persistent_homology(
+                neighborhood,
+                maxdim=config.local_ph_maxdim,
+                filtration=filtration,
+            )
+            for key, value in ph_summary.items():
+                if key.startswith("ph_"):
+                    record[f"local_{filtration}_{key}"] = value
+        rows.append(record)
+
+    local_feature_table = pd.DataFrame.from_records(rows)
+    labels = local_feature_table["protein_in_any_complex"].to_numpy()
+    metric_rows = []
+
+    baseline_metrics = repeated_split_logistic_metrics(
+        local_feature_table[baseline_columns].fillna(0.0).to_numpy(),
+        labels,
+        repeats=config.local_repeats,
+        test_fraction=config.local_test_fraction,
+        seed=config.random_seed,
+    )
+    metric_rows.append(
+        {
+            "experiment": "local_neighborhood",
+            "filtration": "baseline_only",
+            "model": "baseline_only",
+            "mean_auroc": float(baseline_metrics["mean_auroc"]),
+            "mean_average_precision": float(baseline_metrics["mean_average_precision"]),
+        }
+    )
+
+    report = {
+        "num_sampled_proteins": int(len(local_feature_table)),
+        "num_positive_proteins": int(local_feature_table["protein_in_any_complex"].sum()),
+        "num_negative_proteins": int(len(local_feature_table) - local_feature_table["protein_in_any_complex"].sum()),
+        "baseline_model": baseline_metrics,
+        "filtrations": {},
+    }
+
+    for filtration in config.filtrations:
+        ph_columns = sorted(
+            column for column in local_feature_table.columns if column.startswith(f"local_{filtration}_ph_")
+        )
+        ph_only_metrics = repeated_split_logistic_metrics(
+            local_feature_table[ph_columns].fillna(0.0).to_numpy(),
+            labels,
+            repeats=config.local_repeats,
+            test_fraction=config.local_test_fraction,
+            seed=config.random_seed + len(metric_rows),
+        )
+        combined_metrics = repeated_split_logistic_metrics(
+            local_feature_table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+            labels,
+            repeats=config.local_repeats,
+            test_fraction=config.local_test_fraction,
+            seed=config.random_seed + len(metric_rows) + 50,
+        )
+        shuffled_labels = labels.copy()
+        np.random.default_rng(config.random_seed + len(metric_rows) + 100).shuffle(shuffled_labels)
+        null_metrics = repeated_split_logistic_metrics(
+            local_feature_table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+            shuffled_labels,
+            repeats=config.local_repeats,
+            test_fraction=config.local_test_fraction,
+            seed=config.random_seed + len(metric_rows) + 150,
+        )
+
+        report["filtrations"][filtration] = {
+            "ph_only": ph_only_metrics,
+            "baseline_plus_ph": combined_metrics,
+            "label_shuffle_null": null_metrics,
+            "num_ph_features": len(ph_columns),
+        }
+        metric_rows.append(
+            {
+                "experiment": "local_neighborhood",
+                "filtration": filtration,
+                "model": "ph_only",
+                "mean_auroc": float(ph_only_metrics["mean_auroc"]),
+                "mean_average_precision": float(ph_only_metrics["mean_average_precision"]),
+            }
+        )
+        metric_rows.append(
+            {
+                "experiment": "local_neighborhood",
+                "filtration": filtration,
+                "model": "baseline_plus_ph",
+                "mean_auroc": float(combined_metrics["mean_auroc"]),
+                "mean_average_precision": float(combined_metrics["mean_average_precision"]),
+            }
+        )
+        metric_rows.append(
+            {
+                "experiment": "local_neighborhood",
+                "filtration": filtration,
+                "model": "label_shuffle_null",
+                "mean_auroc": float(null_metrics["mean_auroc"]),
+                "mean_average_precision": float(null_metrics["mean_average_precision"]),
+            }
+        )
+
+    metric_table = pd.DataFrame.from_records(metric_rows)
+    return local_feature_table, metric_table, report
+
+
+def run_filtration_comparison_experiment(
+    graph: nx.Graph,
+    complexes: list[list[str]],
+    config: ExtensionExplorationConfig,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    decision_like_config = DecisionStageConfig(
+        random_seed=config.random_seed,
+        repeats=config.filtration_repeats,
+        test_fraction=config.filtration_test_fraction,
+        matched_random_per_complex=config.filtration_matched_random_per_complex,
+        max_random_attempts=config.filtration_max_random_attempts,
+        min_complex_size=config.filtration_min_complex_size,
+        max_complex_size=config.filtration_max_complex_size,
+        max_real_complexes=config.filtration_max_real_complexes,
+        subgraph_ph_node_cap=config.filtration_subgraph_ph_node_cap,
+        random_walk_restart_prob=config.filtration_random_walk_restart_prob,
+    )
+    instance_specs = _build_complex_instance_specs(graph, complexes, decision_like_config)
+    baseline_columns = [
+        "num_nodes",
+        "num_edges",
+        "density",
+        "mean_degree",
+        "mean_strength",
+        "mean_clustering",
+        "num_connected_components",
+    ]
+    metric_rows = []
+    report = {
+        "num_instance_rows": int(len(instance_specs)),
+        "num_real_complexes": int(sum(1 for spec in instance_specs if spec["label"] == 1)),
+        "num_random_controls": int(sum(1 for spec in instance_specs if spec["label"] == 0)),
+        "filtrations": {},
+    }
+
+    for filtration in config.filtrations:
+        table = _build_complex_instance_feature_table(
+            graph,
+            instance_specs,
+            decision_like_config,
+            filtration=filtration,
+        )
+        groups = table["complex_group"].to_numpy()
+        labels = table["label"].to_numpy()
+        ph_columns = sorted(column for column in table.columns if column.startswith(f"{filtration}_ph_"))
+        ph_metrics = repeated_group_split_logistic_metrics(
+            table[ph_columns].fillna(0.0).to_numpy(),
+            labels,
+            groups,
+            repeats=config.filtration_repeats,
+            test_fraction=config.filtration_test_fraction,
+            seed=config.random_seed + len(metric_rows),
+        )
+        combined_metrics = repeated_group_split_logistic_metrics(
+            table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+            labels,
+            groups,
+            repeats=config.filtration_repeats,
+            test_fraction=config.filtration_test_fraction,
+            seed=config.random_seed + len(metric_rows) + 30,
+        )
+        null_labels = _shuffle_labels_within_bins(labels, table["size_bin"].to_numpy(), np.random.default_rng(config.random_seed + len(metric_rows) + 60))
+        null_metrics = repeated_group_split_logistic_metrics(
+            table[baseline_columns + ph_columns].fillna(0.0).to_numpy(),
+            null_labels,
+            groups,
+            repeats=config.filtration_repeats,
+            test_fraction=config.filtration_test_fraction,
+            seed=config.random_seed + len(metric_rows) + 90,
+        )
+
+        metric_rows.append(
+            {
+                "experiment": "filtration_comparison",
+                "filtration": filtration,
+                "model": "ph_only",
+                "mean_auroc": float(ph_metrics["mean_auroc"]),
+                "mean_average_precision": float(ph_metrics["mean_average_precision"]),
+            }
+        )
+        metric_rows.append(
+            {
+                "experiment": "filtration_comparison",
+                "filtration": filtration,
+                "model": "baseline_plus_ph",
+                "mean_auroc": float(combined_metrics["mean_auroc"]),
+                "mean_average_precision": float(combined_metrics["mean_average_precision"]),
+            }
+        )
+        metric_rows.append(
+            {
+                "experiment": "filtration_comparison",
+                "filtration": filtration,
+                "model": "label_shuffle_null",
+                "mean_auroc": float(null_metrics["mean_auroc"]),
+                "mean_average_precision": float(null_metrics["mean_average_precision"]),
+            }
+        )
+        report["filtrations"][filtration] = {
+            "ph_only": ph_metrics,
+            "baseline_plus_ph": combined_metrics,
+            "label_shuffle_null": null_metrics,
+            "num_ph_features": len(ph_columns),
+        }
+
+    metric_table = pd.DataFrame.from_records(metric_rows)
+    return metric_table, report
+
+
 def _matched_random_subgraph_table(
     graph: nx.Graph,
     complexes: list[list[str]],
@@ -293,9 +560,19 @@ def _matched_random_subgraph_table(
 ) -> pd.DataFrame:
     rng = np.random.default_rng(config.random_seed)
     degree_lookup = dict(graph.degree())
+    graph_nodes = np.array(list(graph.nodes()))
     records: list[dict[str, float | int | str]] = []
 
-    eligible_complexes = _select_eligible_complexes(graph, complexes, config)
+    eligible_complexes = [
+        complex_members
+        for complex_members in complexes
+        if (
+            len(complex_members) >= config.min_complex_size
+            and len(complex_members) <= config.max_complex_size
+            and set(complex_members).issubset(graph.nodes)
+        )
+    ]
+    eligible_complexes = eligible_complexes[: config.max_real_complexes]
     for index, complex_members in enumerate(eligible_complexes):
         real_subgraph = graph.subgraph(complex_members).copy()
         target_density = nx.density(real_subgraph) if real_subgraph.number_of_nodes() > 1 else 0.0
@@ -305,7 +582,6 @@ def _matched_random_subgraph_table(
             for node in real_subgraph.nodes
         ]
         target_mean_strength = float(np.mean(real_strengths)) if real_strengths else 0.0
-
         for control_index in range(config.matched_random_per_complex):
             sampled_nodes, match_score = _sample_matched_random_nodes(
                 graph,
@@ -317,8 +593,9 @@ def _matched_random_subgraph_table(
                 config,
                 rng,
             )
+            sampled_subgraph = graph.subgraph(sampled_nodes).copy()
             record = build_complex_subgraph_feature_table(
-                graph.subgraph(sampled_nodes).copy(),
+                sampled_subgraph,
                 [list(sampled_nodes)],
                 source_label="matched_random",
                 min_complex_size=config.min_complex_size,
@@ -336,6 +613,106 @@ def _matched_random_subgraph_table(
             record["target_mean_strength"] = float(target_mean_strength)
             records.append(record)
     return pd.DataFrame.from_records(records)
+
+
+def _build_complex_instance_specs(
+    graph: nx.Graph,
+    complexes: list[list[str]],
+    config: DecisionStageConfig,
+) -> list[dict[str, object]]:
+    rng = np.random.default_rng(config.random_seed)
+    degree_lookup = dict(graph.degree())
+    instance_specs: list[dict[str, object]] = []
+    eligible_complexes = _select_eligible_complexes(graph, complexes, config)
+
+    for index, complex_members in enumerate(eligible_complexes):
+        unique_members = [node for node in dict.fromkeys(complex_members) if node in graph]
+        if len(unique_members) < config.min_complex_size:
+            continue
+
+        real_subgraph = graph.subgraph(unique_members).copy()
+        target_density = nx.density(real_subgraph) if real_subgraph.number_of_nodes() > 1 else 0.0
+        target_mean_degree = float(np.mean([degree_lookup[node] for node in unique_members]))
+        real_strengths = [
+            sum(edge_data.get("SemSim", 1.0) for _, _, edge_data in real_subgraph.edges(node, data=True))
+            for node in real_subgraph.nodes
+        ]
+        target_mean_strength = float(np.mean(real_strengths)) if real_strengths else 0.0
+        group_name = f"group_{index}"
+        size_bin = _size_bin(len(unique_members))
+
+        instance_specs.append(
+            {
+                "group": group_name,
+                "source": "real_complex",
+                "label": 1,
+                "nodes": unique_members,
+                "size_bin": size_bin,
+                "match_score": np.nan,
+                "target_density": target_density,
+                "target_mean_degree": target_mean_degree,
+                "target_mean_strength": target_mean_strength,
+            }
+        )
+
+        for control_index in range(config.matched_random_per_complex):
+            sampled_nodes, match_score = _sample_matched_random_nodes(
+                graph,
+                len(unique_members),
+                target_density,
+                target_mean_degree,
+                target_mean_strength,
+                set(unique_members),
+                config,
+                rng,
+            )
+            instance_specs.append(
+                {
+                    "group": group_name,
+                    "source": "matched_random",
+                    "label": 0,
+                    "nodes": sampled_nodes,
+                    "size_bin": size_bin,
+                    "match_score": float(match_score),
+                    "target_density": target_density,
+                    "target_mean_degree": target_mean_degree,
+                    "target_mean_strength": target_mean_strength,
+                    "control_index": control_index,
+                }
+            )
+    return instance_specs
+
+
+def _build_complex_instance_feature_table(
+    graph: nx.Graph,
+    instance_specs: list[dict[str, object]],
+    config: DecisionStageConfig,
+    *,
+    filtration: str,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for index, spec in enumerate(instance_specs):
+        record = build_subgraph_feature_record(
+            graph,
+            list(spec["nodes"]),
+            subgraph_id=f"{spec['source']}_{index}",
+            source=str(spec["source"]),
+            label=int(spec["label"]),
+            ph_node_cap=config.subgraph_ph_node_cap,
+            ph_sampling_seed=config.random_seed + index,
+            filtration=filtration,
+            ph_feature_prefix=filtration,
+        )
+        if record is None:
+            continue
+        record["complex_group"] = str(spec["group"])
+        record["size_bin"] = str(spec["size_bin"])
+        record["match_score"] = float(spec.get("match_score", np.nan))
+        record["target_density"] = float(spec.get("target_density", np.nan))
+        record["target_mean_degree"] = float(spec.get("target_mean_degree", np.nan))
+        record["target_mean_strength"] = float(spec.get("target_mean_strength", np.nan))
+        rows.append(record)
+    return pd.DataFrame.from_records(rows)
 
 
 def _sample_matched_random_nodes(
@@ -461,10 +838,29 @@ def _shuffle_labels_within_bins(
     return shuffled
 
 
+def _sample_protein_panel(
+    protein_feature_table: pd.DataFrame,
+    config: ExtensionExplorationConfig,
+) -> pd.DataFrame:
+    rng = np.random.default_rng(config.random_seed)
+    positive = protein_feature_table[protein_feature_table["protein_in_any_complex"] == 1]
+    negative = protein_feature_table[protein_feature_table["protein_in_any_complex"] == 0]
+
+    n_positive = min(config.local_positive_proteins, len(positive))
+    n_negative = min(config.local_negative_proteins, len(negative))
+    positive_sample = positive.iloc[rng.choice(len(positive), size=n_positive, replace=False)]
+    negative_sample = negative.iloc[rng.choice(len(negative), size=n_negative, replace=False)]
+    return (
+        pd.concat([positive_sample, negative_sample], ignore_index=True)
+        .sort_values(by="protein")
+        .reset_index(drop=True)
+    )
+
+
 def _apply_weight_jitter(graph: nx.Graph, config: DecisionStageConfig) -> nx.Graph:
     rng = np.random.default_rng(config.random_seed + 10)
     perturbed = graph.copy()
-    for _, _, data in perturbed.edges(data=True):
+    for node_a, node_b, data in perturbed.edges(data=True):
         jittered = float(np.clip(data.get("SemSim", 0.0) + rng.normal(0.0, config.weight_jitter_std), 0.0, 1.0))
         data["SemSim"] = jittered
     return perturbed

@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from .evaluation import summarize_complex_coverage, summarize_degree_baseline
+from .evaluation import build_protein_feature_table, summarize_complex_coverage, summarize_degree_baseline
 from .experiments import (
     DecisionStageConfig,
+    ExtensionExplorationConfig,
     config_to_dict,
+    run_filtration_comparison_experiment,
     run_complex_vs_random_experiment,
     run_data_sanity_experiment,
     run_global_ph_characterization_experiment,
+    run_local_neighborhood_ph_experiment,
     run_null_control_experiment,
     run_protein_baseline_experiment,
     synthesize_decision,
@@ -139,4 +142,60 @@ def run_biogrid_decision_stage_workflow(
         },
     }
     write_json(report, report_dir / "decision_report.json")
+    return report
+
+
+def run_biogrid_local_filtration_exploration_workflow(
+    config: ExtensionExplorationConfig | None = None,
+    *,
+    run_name: str = "biogrid_local_filtration_exploration",
+) -> dict[str, object]:
+    config = config or ExtensionExplorationConfig()
+    paths = get_repo_paths()
+    ppi_path = paths.data_dir / "Human_PPI_Network.txt"
+    complexes_path = paths.data_dir / "CORUM_Human_Complexes.txt"
+
+    ppi_df = load_biogrid_ppi(ppi_path)
+    complexes = load_corum_complexes(complexes_path)
+    graph = build_weighted_graph(ppi_df)
+    protein_feature_table = build_protein_feature_table(graph, complexes)
+
+    processed_dir = ensure_directory(paths.processed_dir / run_name)
+    report_dir = ensure_directory(paths.reports_dir / run_name)
+
+    local_feature_table, local_metric_table, local_report = run_local_neighborhood_ph_experiment(
+        graph,
+        protein_feature_table,
+        config,
+    )
+    filtration_metric_table, filtration_report = run_filtration_comparison_experiment(
+        graph,
+        complexes,
+        config,
+    )
+
+    write_table(local_feature_table, processed_dir / "local_neighborhood_features.csv")
+    write_table(local_metric_table, processed_dir / "local_neighborhood_metrics.csv")
+    write_table(filtration_metric_table, processed_dir / "filtration_comparison_metrics.csv")
+
+    report = {
+        "run_name": run_name,
+        "timestamp_utc": datetime.now(UTC).isoformat(),
+        "inputs": {
+            "ppi": str(ppi_path.relative_to(paths.repo_root)),
+            "complexes": str(complexes_path.relative_to(paths.repo_root)),
+        },
+        "config": config_to_dict(config),
+        "experiments": {
+            "local_neighborhood_ph": local_report,
+            "filtration_comparison": filtration_report,
+        },
+        "outputs": {
+            "processed_dir": str(processed_dir.relative_to(paths.repo_root)),
+            "local_neighborhood_features": str((processed_dir / "local_neighborhood_features.csv").relative_to(paths.repo_root)),
+            "local_neighborhood_metrics": str((processed_dir / "local_neighborhood_metrics.csv").relative_to(paths.repo_root)),
+            "filtration_comparison_metrics": str((processed_dir / "filtration_comparison_metrics.csv").relative_to(paths.repo_root)),
+        },
+    }
+    write_json(report, report_dir / "exploration_report.json")
     return report
