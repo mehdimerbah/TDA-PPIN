@@ -3,7 +3,21 @@ from __future__ import annotations
 from collections import Counter
 
 import networkx as nx
+import numpy as np
 import pandas as pd
+
+from .ph import sample_graph_for_ph, summarize_graph_persistent_homology
+from .stats import binary_auroc
+
+
+def _safe_weighted_clustering(graph: nx.Graph) -> dict[str, float]:
+    if graph.number_of_edges() == 0:
+        return {node: 0.0 for node in graph.nodes}
+
+    max_weight = max(float(data.get("SemSim", 1.0)) for _, _, data in graph.edges(data=True))
+    if max_weight <= 0:
+        return {node: 0.0 for node in graph.nodes}
+    return nx.clustering(graph, weight="SemSim")
 
 
 def summarize_complex_coverage(
@@ -26,8 +40,8 @@ def summarize_complex_coverage(
 
 def summarize_degree_baseline(graph: nx.Graph, complexes: list[list[str]]) -> pd.DataFrame:
     degrees = dict(graph.degree())
-    membership = Counter(node for complex_members in complexes for node in complex_members)
     records = []
+    membership = Counter(node for complex_members in complexes for node in complex_members)
     for node, degree in degrees.items():
         records.append(
             {
@@ -40,3 +54,132 @@ def summarize_degree_baseline(graph: nx.Graph, complexes: list[list[str]]) -> pd
         by=["complex_membership_count", "degree"],
         ascending=False,
     )
+
+
+def build_membership_lookup(complexes: list[list[str]]) -> Counter:
+    return Counter(node for complex_members in complexes for node in complex_members)
+
+
+def build_protein_feature_table(graph: nx.Graph, complexes: list[list[str]]) -> pd.DataFrame:
+    membership = build_membership_lookup(complexes)
+    rows: list[dict[str, float | int | str]] = []
+    clustering = _safe_weighted_clustering(graph)
+    for node in graph.nodes:
+        ego_graph = nx.ego_graph(graph, node)
+        strength = sum(edge_data.get("SemSim", 1.0) for _, _, edge_data in graph.edges(node, data=True))
+        rows.append(
+            {
+                "protein": node,
+                "degree": int(graph.degree(node)),
+                "strength": float(strength),
+                "clustering": float(clustering.get(node, 0.0)),
+                "ego_nodes": int(ego_graph.number_of_nodes()),
+                "ego_edges": int(ego_graph.number_of_edges()),
+                "local_density": float(nx.density(ego_graph)) if ego_graph.number_of_nodes() > 1 else 0.0,
+                "complex_membership_count": int(membership.get(node, 0)),
+                "protein_in_any_complex": int(membership.get(node, 0) > 0),
+            }
+        )
+    return pd.DataFrame.from_records(rows).sort_values(by="protein").reset_index(drop=True)
+
+
+def build_subgraph_feature_record(
+    graph: nx.Graph,
+    members: list[str],
+    *,
+    subgraph_id: str,
+    source: str,
+    label: int,
+    ph_node_cap: int | None = None,
+    ph_sampling_seed: int = 7,
+) -> dict[str, float | int | str] | None:
+    unique_members = [node for node in dict.fromkeys(members) if node in graph]
+    if len(unique_members) == 0:
+        return None
+
+    subgraph = graph.subgraph(unique_members).copy()
+    if subgraph.number_of_nodes() == 0:
+        return None
+
+    degrees = dict(subgraph.degree())
+    strength_values = [
+        sum(edge_data.get("SemSim", 1.0) for _, _, edge_data in subgraph.edges(node, data=True))
+        for node in subgraph.nodes
+    ]
+    ph_graph = (
+        sample_graph_for_ph(subgraph, max_nodes=ph_node_cap, seed=ph_sampling_seed)
+        if ph_node_cap is not None and subgraph.number_of_nodes() > ph_node_cap
+        else subgraph
+    )
+    ph_summary = summarize_graph_persistent_homology(ph_graph)
+    record: dict[str, float | int | str] = {
+        "subgraph_id": subgraph_id,
+        "source": source,
+        "label": label,
+        "num_nodes": int(subgraph.number_of_nodes()),
+        "num_edges": int(subgraph.number_of_edges()),
+        "density": float(nx.density(subgraph)) if subgraph.number_of_nodes() > 1 else 0.0,
+        "mean_degree": float(np.mean(list(degrees.values()))) if degrees else 0.0,
+        "mean_strength": float(np.mean(strength_values)) if strength_values else 0.0,
+        "mean_clustering": float(np.mean(list(_safe_weighted_clustering(subgraph).values()))),
+        "num_connected_components": float(nx.number_connected_components(subgraph)),
+        "ph_num_nodes_used": int(ph_graph.number_of_nodes()),
+    }
+    record.update(ph_summary)
+    return record
+
+
+def build_complex_subgraph_feature_table(
+    graph: nx.Graph,
+    complexes: list[list[str]],
+    *,
+    source_label: str,
+    min_complex_size: int = 3,
+    ph_node_cap: int | None = None,
+    ph_sampling_seed: int = 7,
+) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    for index, complex_members in enumerate(complexes):
+        unique_members = [node for node in dict.fromkeys(complex_members) if node in graph]
+        if len(unique_members) < min_complex_size:
+            continue
+        record = build_subgraph_feature_record(
+            graph,
+            unique_members,
+            subgraph_id=f"{source_label}_{index}",
+            source=source_label,
+            label=1 if source_label == "real_complex" else 0,
+            ph_node_cap=ph_node_cap,
+            ph_sampling_seed=ph_sampling_seed + index,
+        )
+        if record is not None:
+            rows.append(record)
+    return pd.DataFrame.from_records(rows)
+
+
+def univariate_signal_summary(
+    feature_table: pd.DataFrame,
+    feature_columns: list[str],
+    label_column: str,
+) -> pd.DataFrame:
+    labels = feature_table[label_column].to_numpy()
+    positive_mask = labels == 1
+    negative_mask = labels == 0
+    rows = []
+    for feature_column in feature_columns:
+        values = feature_table[feature_column].fillna(0.0).to_numpy(dtype=float)
+        auroc = binary_auroc(labels, values)
+        rows.append(
+            {
+                "feature": feature_column,
+                "positive_mean": float(np.mean(values[positive_mask])) if positive_mask.any() else 0.0,
+                "negative_mean": float(np.mean(values[negative_mask])) if negative_mask.any() else 0.0,
+                "mean_difference": float(
+                    (np.mean(values[positive_mask]) if positive_mask.any() else 0.0)
+                    - (np.mean(values[negative_mask]) if negative_mask.any() else 0.0)
+                ),
+                "auroc": float(auroc),
+                "rank_biserial": float(2 * auroc - 1),
+            }
+        )
+    return pd.DataFrame.from_records(rows).sort_values(by="auroc", ascending=False).reset_index(drop=True)

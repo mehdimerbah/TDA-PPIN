@@ -1,0 +1,224 @@
+{
+  "config": {
+    "density_tolerance": 0.15,
+    "edge_subsample_fraction": 0.9,
+    "global_ph_node_cap": 120,
+    "hub_removal_fraction": 0.01,
+    "matched_random_per_complex": 2,
+    "max_complex_size": 25,
+    "max_random_attempts": 120,
+    "max_real_complexes": 100,
+    "min_complex_size": 3,
+    "node_subsample_fraction": 0.9,
+    "random_seed": 7,
+    "random_walk_restart_prob": 0.15,
+    "repeats": 4,
+    "subgraph_ph_node_cap": 60,
+    "test_fraction": 0.25,
+    "weight_jitter_std": 0.05
+  },
+  "decision": {
+    "baseline_complex_auroc": 0.9393999999999999,
+    "combined_complex_auroc": 0.9254,
+    "coverage_ok": true,
+    "mean_cosine_to_original": 0.9774484122607657,
+    "null_complex_auroc": 0.4593785233804759,
+    "ph_complex_auroc": 0.8934,
+    "verdict": "no_go"
+  },
+  "experiments": {
+    "complex_vs_random": {
+      "baseline_columns": [
+        "num_nodes",
+        "num_edges",
+        "density",
+        "mean_degree",
+        "mean_strength",
+        "mean_clustering",
+        "num_connected_components"
+      ],
+      "baseline_model": {
+        "auroc_values": [
+          0.9096,
+          0.9912,
+          0.908,
+          0.9488
+        ],
+        "average_precision_values": [
+          0.9034653686894352,
+          0.9837230769230768,
+          0.9057563037174827,
+          0.9201172616015125
+        ],
+        "mean_auroc": 0.9393999999999999,
+        "mean_average_precision": 0.9282655027328768
+      },
+      "combined_model": {
+        "auroc_values": [
+          0.8728,
+          0.9136,
+          0.932,
+          0.9832
+        ],
+        "average_precision_values": [
+          0.8485156330259778,
+          0.8947034900184044,
+          0.9037547175399587,
+          0.9707796840840319
+        ],
+        "mean_auroc": 0.9254,
+        "mean_average_precision": 0.9044383811670932
+      },
+      "max_complex_size": 25,
+      "max_real_complexes": 100,
+      "num_random_subgraphs": 200,
+      "num_real_subgraphs": 100,
+      "ph_columns": [
+        "ph_dim0_count",
+        "ph_dim0_finite_count",
+        "ph_dim0_max_lifetime",
+        "ph_dim0_mean_lifetime",
+        "ph_dim0_total_persistence",
+        "ph_dim1_count",
+        "ph_dim1_finite_count",
+        "ph_dim1_landscape_l1",
+        "ph_dim1_landscape_max",
+        "ph_dim1_max_lifetime",
+        "ph_dim1_mean_lifetime",
+        "ph_dim1_total_persistence",
+        "ph_dim2_count",
+        "ph_dim2_finite_count",
+        "ph_dim2_max_lifetime",
+        "ph_dim2_mean_lifetime",
+        "ph_dim2_total_persistence",
+        "ph_num_nodes_used"
+      ],
+      "ph_model": {
+        "auroc_values": [
+          0.9376,
+          0.8512,
+          0.8616,
+          0.9232
+        ],
+        "average_precision_values": [
+          0.9376292588469167,
+          0.8454842882641361,
+          0.8326592805125935,
+          0.8816554445987748
+        ],
+        "mean_auroc": 0.8934,
+        "mean_average_precision": 0.8743570680556052
+      }
+    },
+    "data_sanity": {
+      "fraction_fully_covered_complexes": 0.9546313799621928,
+      "mean_complex_size": 4.323629489603024,
+      "mean_degree_in_complex": 95.81094808126412,
+      "mean_degree_outside_complex": 23.831771750616415,
+      "median_complex_size": 3.0,
+      "num_complexes": 2645.0,
+      "num_fully_covered_complexes": 2525.0,
+      "num_graph_edges": 338923.0,
+      "num_graph_nodes": 17739.0
+    },
+    "global_ph_stability": {
+      "global_ph_node_cap": 120,
+      "mean_cosine_to_original": 0.9774484122607657,
+      "min_cosine_to_original": 0.9135528425483348,
+      "summary_keys": [
+        "ph_dim0_count",
+        "ph_dim0_finite_count",
+        "ph_dim0_max_lifetime",
+        "ph_dim0_mean_lifetime",
+        "ph_dim0_total_persistence",
+        "ph_dim1_count",
+        "ph_dim1_finite_count",
+        "ph_dim1_landscape_l1",
+        "ph_dim1_landscape_max",
+        "ph_dim1_max_lifetime",
+        "ph_dim1_mean_lifetime",
+        "ph_dim1_total_persistence",
+        "ph_dim2_count",
+        "ph_dim2_finite_count",
+        "ph_dim2_max_lifetime",
+        "ph_dim2_mean_lifetime",
+        "ph_dim2_total_persistence"
+      ]
+    },
+    "null_controls": {
+      "complex_label_shuffle": {
+        "auroc_values": [
+          0.5339506172839507,
+          0.4057203389830508,
+          0.49673202614379086,
+          0.4011111111111111
+        ],
+        "average_precision_values": [
+          0.39340424295384163,
+          0.20355265850321244,
+          0.3737790375915308,
+          0.18789005451639956
+        ],
+        "mean_auroc": 0.4593785233804759,
+        "mean_average_precision": 0.2896564983912461
+      },
+      "protein_label_shuffle": {
+        "auroc_values": [
+          0.494865978894143,
+          0.4985221612158829,
+          0.5081027179377298,
+          0.505571925739993
+        ],
+        "average_precision_values": [
+          0.19712487797685355,
+          0.20070167964187943,
+          0.19188280195067745,
+          0.21128498526368722
+        ],
+        "mean_auroc": 0.5017656959469372,
+        "mean_average_precision": 0.2002485862082744
+      }
+    },
+    "protein_baseline": {
+      "baseline_model": {
+        "auroc_values": [
+          0.8261787619495129,
+          0.8434861811215577,
+          0.8435967307660451,
+          0.8271212519208714
+        ],
+        "average_precision_values": [
+          0.5567654846314645,
+          0.5967435896745285,
+          0.5954887839887031,
+          0.567723612854322
+        ],
+        "mean_auroc": 0.8350957314394968,
+        "mean_average_precision": 0.5791803677872546
+      },
+      "feature_columns": [
+        "degree",
+        "strength",
+        "clustering",
+        "ego_nodes",
+        "ego_edges",
+        "local_density"
+      ],
+      "num_negative_proteins": 14195,
+      "num_positive_proteins": 3544
+    }
+  },
+  "inputs": {
+    "complexes": "data/CORUM_Human_Complexes.txt",
+    "ppi": "data/Human_PPI_Network.txt"
+  },
+  "outputs": {
+    "complex_vs_random_features": "results/processed/biogrid_validation_sweep/complex_vs_random_features.csv",
+    "global_ph_stability": "results/processed/biogrid_validation_sweep/global_ph_stability.csv",
+    "processed_dir": "results/processed/biogrid_validation_sweep",
+    "protein_feature_table": "results/processed/biogrid_validation_sweep/protein_feature_table.csv",
+    "protein_univariate_signal": "results/processed/biogrid_validation_sweep/protein_univariate_signal.csv"
+  },
+  "run_name": "biogrid_validation_sweep",
+  "timestamp_utc": "2026-04-16T13:45:07.624945+00:00"
+}
