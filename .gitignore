@@ -5,3 +5,4 @@ __pycache__/
 .mypy_cache/
 .ipynb_checkpoints/
 *.egg-info/
+results/processed/*/protein_feature_table.csv
