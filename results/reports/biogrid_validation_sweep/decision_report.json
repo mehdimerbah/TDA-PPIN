@@ -21,8 +21,8 @@
     "baseline_complex_auroc": 0.9393999999999999,
     "combined_complex_auroc": 0.9254,
     "coverage_ok": true,
-    "mean_cosine_to_original": 0.9774484122607657,
-    "null_complex_auroc": 0.4593785233804759,
+    "mean_cosine_to_original": 0.9774484122607658,
+    "null_complex_auroc": 0.45566161084647294,
     "ph_complex_auroc": 0.8934,
     "verdict": "no_go"
   },
@@ -123,7 +123,7 @@
     },
     "global_ph_stability": {
       "global_ph_node_cap": 120,
-      "mean_cosine_to_original": 0.9774484122607657,
+      "mean_cosine_to_original": 0.9774484122607658,
       "min_cosine_to_original": 0.9135528425483348,
       "summary_keys": [
         "ph_dim0_count",
@@ -148,19 +148,19 @@
     "null_controls": {
       "complex_label_shuffle": {
         "auroc_values": [
-          0.5339506172839507,
-          0.4057203389830508,
-          0.49673202614379086,
-          0.4011111111111111
+          0.533179012345679,
+          0.4099576271186441,
+          0.48284313725490197,
+          0.39666666666666667
         ],
         "average_precision_values": [
-          0.39340424295384163,
-          0.20355265850321244,
-          0.3737790375915308,
-          0.18789005451639956
+          0.39201340942762014,
+          0.20487982453630854,
+          0.370101122786624,
+          0.18311756609438828
         ],
-        "mean_auroc": 0.4593785233804759,
-        "mean_average_precision": 0.2896564983912461
+        "mean_auroc": 0.45566161084647294,
+        "mean_average_precision": 0.28752798071123525
       },
       "protein_label_shuffle": {
         "auroc_values": [
@@ -220,5 +220,5 @@
     "protein_univariate_signal": "results/processed/biogrid_validation_sweep/protein_univariate_signal.csv"
   },
   "run_name": "biogrid_validation_sweep",
-  "timestamp_utc": "2026-04-16T13:45:07.624945+00:00"
+  "timestamp_utc": "2026-04-19T15:26:31.374120+00:00"
 }

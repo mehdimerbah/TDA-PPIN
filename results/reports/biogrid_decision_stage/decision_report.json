@@ -2,29 +2,29 @@
   "config": {
     "density_tolerance": 0.15,
     "edge_subsample_fraction": 0.9,
-    "global_ph_node_cap": 120,
+    "global_ph_node_cap": 250,
     "hub_removal_fraction": 0.01,
-    "matched_random_per_complex": 1,
-    "max_complex_size": 25,
-    "max_random_attempts": 80,
-    "max_real_complexes": 40,
+    "matched_random_per_complex": 3,
+    "max_complex_size": 40,
+    "max_random_attempts": 100,
+    "max_real_complexes": 250,
     "min_complex_size": 3,
     "node_subsample_fraction": 0.9,
     "random_seed": 7,
     "random_walk_restart_prob": 0.15,
-    "repeats": 2,
-    "subgraph_ph_node_cap": 60,
+    "repeats": 3,
+    "subgraph_ph_node_cap": 120,
     "test_fraction": 0.25,
     "weight_jitter_std": 0.05
   },
   "decision": {
-    "baseline_complex_auroc": 0.96,
-    "combined_complex_auroc": 0.99,
+    "baseline_complex_auroc": 0.9432882414151925,
+    "combined_complex_auroc": 0.9610648629899411,
     "coverage_ok": true,
-    "mean_cosine_to_original": 0.9774484122607657,
-    "null_complex_auroc": 0.5632891414141414,
-    "ph_complex_auroc": 0.9450000000000001,
-    "verdict": "conditional_go"
+    "mean_cosine_to_original": 0.9894949933794099,
+    "null_complex_auroc": 0.48177946226239293,
+    "ph_complex_auroc": 0.887848306162562,
+    "verdict": "no_go"
   },
   "experiments": {
     "complex_vs_random": {
@@ -39,32 +39,36 @@
       ],
       "baseline_model": {
         "auroc_values": [
-          0.95,
-          0.97
+          0.9273326396115158,
+          0.9501387443635102,
+          0.9523933402705516
         ],
         "average_precision_values": [
-          0.9614285714285714,
-          0.976923076923077
+          0.8950881819679322,
+          0.9178239870575773,
+          0.9029699831612895
         ],
-        "mean_auroc": 0.96,
-        "mean_average_precision": 0.9691758241758242
+        "mean_auroc": 0.9432882414151925,
+        "mean_average_precision": 0.905294050728933
       },
       "combined_model": {
         "auroc_values": [
-          0.99,
-          0.99
+          0.9794484911550468,
+          0.954474505723205,
+          0.9492715920915713
         ],
         "average_precision_values": [
-          0.990909090909091,
-          0.990909090909091
+          0.9486408373093305,
+          0.9096803464287342,
+          0.907862925984166
         ],
-        "mean_auroc": 0.99,
-        "mean_average_precision": 0.990909090909091
+        "mean_auroc": 0.9610648629899411,
+        "mean_average_precision": 0.9220613699074102
       },
-      "max_complex_size": 25,
-      "max_real_complexes": 40,
-      "num_random_subgraphs": 40,
-      "num_real_subgraphs": 40,
+      "max_complex_size": 40,
+      "max_real_complexes": 250,
+      "num_random_subgraphs": 750,
+      "num_real_subgraphs": 250,
       "ph_columns": [
         "ph_dim0_count",
         "ph_dim0_finite_count",
@@ -87,15 +91,17 @@
       ],
       "ph_model": {
         "auroc_values": [
-          0.98,
-          0.91
+          0.8715747485258412,
+          0.9281997918834547,
+          0.8637703780783905
         ],
         "average_precision_values": [
-          0.9833333333333334,
-          0.9194230769230769
+          0.822871728565012,
+          0.8820690166536991,
+          0.7948979424364747
         ],
-        "mean_auroc": 0.9450000000000001,
-        "mean_average_precision": 0.9513782051282051
+        "mean_auroc": 0.887848306162562,
+        "mean_average_precision": 0.8332795625517285
       }
     },
     "data_sanity": {
@@ -110,9 +116,9 @@
       "num_graph_nodes": 17739.0
     },
     "global_ph_stability": {
-      "global_ph_node_cap": 120,
-      "mean_cosine_to_original": 0.9774484122607657,
-      "min_cosine_to_original": 0.9135528425483348,
+      "global_ph_node_cap": 250,
+      "mean_cosine_to_original": 0.9894949933794099,
+      "min_cosine_to_original": 0.9667686466028753,
       "summary_keys": [
         "ph_dim0_count",
         "ph_dim0_finite_count",
@@ -136,41 +142,47 @@
     "null_controls": {
       "complex_label_shuffle": {
         "auroc_values": [
-          0.5104166666666666,
-          0.6161616161616161
+          0.5038120567375887,
+          0.4761007981346964,
+          0.4654255319148936
         ],
         "average_precision_values": [
-          0.6593490938885674,
-          0.7099548112706007
+          0.26547196912255283,
+          0.22545185154956163,
+          0.23776277129710408
         ],
-        "mean_auroc": 0.5632891414141414,
-        "mean_average_precision": 0.684651952579584
+        "mean_auroc": 0.48177946226239293,
+        "mean_average_precision": 0.2428955306564062
       },
       "protein_label_shuffle": {
         "auroc_values": [
           0.494865978894143,
-          0.4985221612158829
+          0.4985221612158829,
+          0.5081027179377298
         ],
         "average_precision_values": [
           0.19712487797685355,
-          0.20070167964187943
+          0.20070167964187943,
+          0.19188280195067745
         ],
-        "mean_auroc": 0.496694070055013,
-        "mean_average_precision": 0.1989132788093665
+        "mean_auroc": 0.5004969526825852,
+        "mean_average_precision": 0.1965697865231368
       }
     },
     "protein_baseline": {
       "baseline_model": {
         "auroc_values": [
           0.8261787619495129,
-          0.8434861811215577
+          0.8434861811215577,
+          0.8435967307660451
         ],
         "average_precision_values": [
           0.5567654846314645,
-          0.5967435896745285
+          0.5967435896745285,
+          0.5954887839887031
         ],
-        "mean_auroc": 0.8348324715355353,
-        "mean_average_precision": 0.5767545371529965
+        "mean_auroc": 0.8377538912790387,
+        "mean_average_precision": 0.582999286098232
       },
       "feature_columns": [
         "degree",
@@ -196,5 +208,5 @@
     "protein_univariate_signal": "results/processed/biogrid_decision_stage/protein_univariate_signal.csv"
   },
   "run_name": "biogrid_decision_stage",
-  "timestamp_utc": "2026-04-16T13:39:23.050270+00:00"
+  "timestamp_utc": "2026-04-17T13:13:47.210520+00:00"
 }
